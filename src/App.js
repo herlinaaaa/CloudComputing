@@ -1,8 +1,18 @@
 import { useEffect, useState } from "react";
+import {
+  Chart as ChartJS,
+  LineElement,
+  CategoryScale,
+  LinearScale,
+  PointElement,
+} from "chart.js";
+import { Line } from "react-chartjs-2";
+
+ChartJS.register(LineElement, CategoryScale, LinearScale, PointElement);
 
 export default function App() {
   const [activities, setActivities] = useState([]);
-  const [sensor, setSensor] = useState([]);
+  const [logs, setLogs] = useState([]);
 
   const [form, setForm] = useState({
     judul_aktivitas: "",
@@ -11,7 +21,7 @@ export default function App() {
     kategori: "",
   });
 
-  // 🔹 FETCH ACTIVITIES
+  // ================= FETCH ACTIVITIES =================
   const fetchActivities = () => {
     fetch("http://localhost:3000/activities")
       .then((res) => res.json())
@@ -19,25 +29,31 @@ export default function App() {
       .catch(console.error);
   };
 
-  // 🔹 FETCH SENSOR
-  const fetchSensor = () => {
-    fetch("http://localhost:3000/sensor")
+  // ================= FETCH LOGS (CloudWatch) =================
+  const fetchLogs = () => {
+    fetch("http://localhost:3000/logs")
       .then((res) => res.json())
-      .then(setSensor)
+      .then(setLogs)
       .catch(console.error);
   };
 
+  // ================= AUTO REFRESH =================
   useEffect(() => {
     fetchActivities();
-    fetchSensor();
+    fetchLogs();
+
+    const interval = setInterval(() => {
+      fetchLogs();
+    }, 5000); // 🔄 setiap 5 detik
+
+    return () => clearInterval(interval);
   }, []);
 
-  // 🔹 INPUT HANDLER
+  // ================= FORM =================
   const handleChange = (e) => {
     setForm({ ...form, [e.target.name]: e.target.value });
   };
 
-  // 🔹 SUBMIT ACTIVITY
   const handleSubmit = (e) => {
     e.preventDefault();
 
@@ -62,6 +78,30 @@ export default function App() {
         fetchActivities();
       })
       .catch(console.error);
+  };
+
+  // ================= CHART DATA =================
+  const chartData = {
+    labels: logs.map((item) =>
+      new Date(item.ts).toLocaleTimeString()
+    ),
+    datasets: [
+      {
+        label: "Temperature",
+        data: logs.map((item) => item.temperature),
+        borderWidth: 2,
+      },
+      {
+        label: "Humidity",
+        data: logs.map((item) => item.humidity),
+        borderWidth: 2,
+      },
+      {
+        label: "Light",
+        data: logs.map((item) => item.light),
+        borderWidth: 2,
+      },
+    ],
   };
 
   return (
@@ -111,43 +151,43 @@ export default function App() {
       {/* ================= ACTIVITIES ================= */}
       <div style={styles.section}>
         <h2>📋 Activities</h2>
-        {activities.length === 0 ? (
-          <p>Tidak ada data</p>
-        ) : (
-          activities.map((item) => (
-            <div key={item.id} style={styles.card}>
-              <h3>{item.judul_aktivitas}</h3>
-              <p><b>Tanggal:</b> {item.tanggal}</p>
-              <p><b>Kategori:</b> {item.kategori}</p>
-              <p>{item.deskripsi}</p>
-            </div>
-          ))
-        )}
+        {activities.map((item) => (
+          <div key={item.id} style={styles.card}>
+            <h3>{item.judul_aktivitas}</h3>
+            <p><b>Tanggal:</b> {item.tanggal}</p>
+            <p><b>Kategori:</b> {item.kategori}</p>
+            <p>{item.deskripsi}</p>
+          </div>
+        ))}
       </div>
 
-      {/* ================= SENSOR ================= */}
+      {/* ================= CHART ================= */}
       <div style={styles.section}>
-        <h2>🌡 Sensor Data</h2>
-        {sensor.length === 0 ? (
-          <p>Tidak ada data sensor</p>
-        ) : (
-          sensor.map((item, index) => (
-            <div key={index} style={styles.card}>
-              <p><b>CO:</b> {item.co}</p>
-              <p><b>Temperature:</b> {item.temperature}</p>
-              <p><b>Humidity:</b> {item.humidity}</p>
-            </div>
-          ))
-        )}
+        <h2>📈 Sensor Chart (Real-time)</h2>
+        <Line data={chartData} />
+        <p>🔄 Update tiap 5 detik</p>
+      </div>
+
+      {/* ================= LOGS ================= */}
+      <div style={styles.section}>
+        <h2>📡 Sensor Logs</h2>
+        {logs.map((item, index) => (
+          <div key={index} style={styles.card}>
+            <p><b>Device:</b> {item.device_id}</p>
+            <p><b>Temp:</b> {item.temperature}°C</p>
+            <p><b>Humidity:</b> {item.humidity}%</p>
+            <p><b>Light:</b> {item.light}</p>
+          </div>
+        ))}
       </div>
     </div>
   );
 }
 
-// 🎨 STYLE
+// ================= STYLE =================
 const styles = {
   container: {
-    maxWidth: "700px",
+    maxWidth: "800px",
     margin: "auto",
     padding: "20px",
     fontFamily: "Arial",
